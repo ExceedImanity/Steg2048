@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Steg2048 hides a small encrypted message inside a valid 2048 trajectory, entirely in your browser.">
+  <meta name="theme-color" content="#24133d">
+  <title>Steg2048 — Browser Steganography Lab</title>
+  <link rel="stylesheet" href="./assets/style.css">
+</head>
+<body>
+<main class="shell">
+  <header data-local-label="LOCAL LAB">
+    <div class="eyebrow" data-i18n="header.eyebrow">STEGANOGRAPHY LAB</div>
+    <h1>STEG<span>2048</span></h1>
+    <p class="subtitle" data-i18n="header.subtitle">Hide a small encrypted message inside a valid 2048 trajectory. Everything runs directly in your browser: no application server, no account, no installation.</p>
+  </header>
+
+  <div class="nav-row">
+    <nav class="tabs" role="tablist" aria-label="Main navigation" data-i18n-aria-label="tabs.aria">
+      <button class="tab-button active" type="button" data-tab="tool" role="tab" aria-selected="true" data-i18n="tabs.tool">⚡ Tool</button>
+      <button class="tab-button" type="button" data-tab="about" role="tab" aria-selected="false" data-i18n="tabs.about">✦ About</button>
+    </nav>
+    <button id="languageToggle" class="language-toggle" type="button" aria-label="Switch to French" title="Switch to French">🌐 FR</button>
+  </div>
+
+  <div id="toolView">
+    <section class="panel">
+      <div class="section-title-row">
+        <h2 data-i18n="encode.title">Encode</h2>
+        <span class="badge secure">AES-256-GCM</span>
+      </div>
+
+      <label for="message" data-i18n="encode.message">Message</label>
+      <textarea id="message" rows="4" placeholder="Your secret message..." data-i18n-placeholder="encode.messagePlaceholder"></textarea>
+      <p class="hint"><span id="messageBytes">0</span> / <span id="messageLimit">96</span> <span data-i18n="encode.bytes">UTF-8 bytes</span></p>
+
+      <div class="password-row">
+        <label for="password" data-i18n="encode.password">Password</label>
+        <div class="password-input-wrap">
+          <input id="password" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" data-i18n-placeholder="encode.passwordPlaceholder">
+          <button type="button" class="icon-button" data-toggle="password" data-i18n="common.show">Show</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="encodeBtn" type="button" data-i18n="encode.generate">Generate game</button>
+        <button id="downloadBtn" type="button" class="secondary" disabled data-i18n="encode.download">Download JSON</button>
+      </div>
+      <p id="encodeError" class="error" role="alert"></p>
+    </section>
+
+    <section id="trajectorySection" class="panel hidden">
+      <div class="section-title-row">
+        <h2 data-i18n="trajectory.title">Generated game</h2>
+        <span class="badge cover" data-i18n="trajectory.badge">Valid trajectory</span>
+      </div>
+
+      <div id="trajectorySummary" class="analysis-summary"></div>
+      <div class="trajectory-player">
+        <div id="playerBoard" class="board player-board" aria-label="2048 board" data-i18n-aria-label="trajectory.boardAria"></div>
+        <div class="player-controls">
+          <h3 id="stepTitle">Initial board</h3>
+          <p id="stepCounter" class="muted">1 / 1</p>
+          <input id="stepRange" class="range" type="range" min="0" max="0" value="0" aria-label="Game step" data-i18n-aria-label="trajectory.rangeAria">
+          <div class="actions">
+            <button id="prevBtn" type="button" class="secondary" data-i18n="trajectory.previous">← Previous</button>
+            <button id="nextBtn" type="button" class="secondary" data-i18n="trajectory.next">Next →</button>
+          </div>
+          <div id="stepEvent" class="event-card"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="decode.title">Import / decode</h2>
+      <label for="jsonBox" data-i18n="decode.json">Steg2048 JSON</label>
+      <textarea id="jsonBox" rows="9" spellcheck="false" placeholder='{"format":"steg2048-web-v1","boards":[...]}'></textarea>
+
+      <div class="password-row">
+        <label for="decodePassword" data-i18n="decode.password">Password</label>
+        <div class="password-input-wrap">
+          <input id="decodePassword" type="password" autocomplete="current-password" placeholder="Message password" data-i18n-placeholder="decode.passwordPlaceholder">
+          <button type="button" class="icon-button" data-toggle="decodePassword" data-i18n="common.show">Show</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="decodeBtn" type="button" data-i18n="decode.decrypt">Decrypt</button>
+        <button id="loadFileBtn" type="button" class="secondary" data-i18n="decode.loadFile">Load JSON file</button>
+        <input id="fileInput" type="file" accept="application/json,.json" hidden>
+      </div>
+      <p id="decodeError" class="error" role="alert"></p>
+    </section>
+
+    <section class="panel output-panel">
+      <h2 data-i18n="decode.outputTitle">Decoded message</h2>
+      <pre id="decoded">—</pre>
+    </section>
+
+    <section class="panel note" data-i18n-html="privacy.note">
+      <strong>Local by design:</strong> the message and password stay in this tab. Steg2048 makes no network request to encode or decode.
+    </section>
+  </div>
+
+  <div id="aboutView" class="hidden">
+    <section class="panel about-hero">
+      <div class="section-title-row">
+        <h2 data-i18n="about.title">About Steg2048</h2>
+        <span class="badge cover" data-i18n="about.badge">100% browser-based</span>
+      </div>
+      <p data-i18n="about.intro1">Steg2048 is a steganography experiment: instead of storing text directly, the application encrypts the message and turns the resulting bits into possible choices along a valid 2048 trajectory.</p>
+      <p data-i18n="about.intro2">The result is a JSON file containing only a sequence of boards. The password is never included in that file.</p>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="about.howTitle">How does it work?</h2>
+      <div class="flow-grid" aria-label="Steg2048 pipeline" data-i18n-aria-label="about.flowAria">
+        <div class="flow-card"><strong>1</strong><span data-i18n="about.flow1">UTF-8 message</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-card"><strong>2</strong><span data-i18n="about.flow2">PBKDF2-SHA-256</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-card"><strong>3</strong><span data-i18n="about.flow3">AES-256-GCM</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-card"><strong>4</strong><span data-i18n="about.flow4">Encrypted bits</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-card"><strong>5</strong><span data-i18n="about.flow5">2048 trajectory</span></div>
+      </div>
+      <p data-i18n="about.howText">At each step, the engine chooses a valid 2048 move. The encrypted bits then select one possible position for the new tile. The decoder replays the exact same logic to recover the bits.</p>
+    </section>
+
+    <section class="about-grid">
+      <article class="panel mini-panel">
+        <h2 data-i18n="about.cryptoTitle">Encryption</h2>
+        <p data-i18n-html="about.crypto1">The browser derives a key from the password with <strong>PBKDF2-SHA-256</strong> (<span id="pbkdfIterations">250,000</span> iterations), a random 16-byte salt and a 256-bit AES key.</p>
+        <p data-i18n-html="about.crypto2"><strong>AES-GCM</strong> encrypts the message and authenticates its integrity. A wrong password or a modified trajectory must make decryption fail.</p>
+      </article>
+
+      <article class="panel mini-panel">
+        <h2 data-i18n="about.privacyTitle">Privacy</h2>
+        <p data-i18n="about.privacy1">This version has no backend. Encoding, decoding and board generation use only JavaScript and the browser Web Crypto API.</p>
+        <p data-i18n="about.privacy2">The site can be served by GitHub Pages, but your message and password are not sent to GitHub during encryption or decryption.</p>
+      </article>
+
+      <article class="panel mini-panel">
+        <h2 data-i18n="about.formatTitle">Format</h2>
+        <p data-i18n-html="about.format1">The current format is <code id="formatName">steg2048-web-v1</code>. The exported JSON contains the format name and the ordered list of boards.</p>
+        <p data-i18n-html="about.format2">Current limit: <strong>96 UTF-8 bytes</strong> per message and a password of at least <span id="passwordMinimum">8</span> characters.</p>
+      </article>
+
+      <article class="panel mini-panel">
+        <h2 data-i18n="about.limitsTitle">Limitations</h2>
+        <p data-i18n="about.limits1">Encryption protects the content; steganography only aims to make the transport less obvious. Steg2048 does not promise that a trajectory is undetectable or that it perfectly resembles a human game.</p>
+        <p data-i18n="about.limits2">For genuinely sensitive data, treat this project as an educational experiment, not as an audited security protocol.</p>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="about.pagesTitle">Why GitHub Pages?</h2>
+      <p data-i18n-html="about.pagesText">Because everything is static: <code>index.html</code>, CSS and JavaScript modules. There is no Flask, no Python to install and no application server to maintain. Once the repository is published with Pages, anyone can open the URL and use the tool.</p>
+      <div class="about-callout">
+        <strong data-i18n="about.calloutTitle">No backend. No telemetry. No runtime dependencies.</strong>
+        <span data-i18n="about.calloutText">The project stays focused on one idea: encrypt a small message and transport it through a valid 2048 trajectory.</span>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>
