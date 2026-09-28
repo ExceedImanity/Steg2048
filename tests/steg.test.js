@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { move } from '../js/simulator2048.js';
 import { FORMAT, decodeBoards, encodeMessage } from '../js/steg.js';
 import { candidateTransitions, validateTrajectory } from '../js/trajectory.js';
@@ -86,3 +87,26 @@ test('English and French UI translations are available', () => {
   assert.match(t('en', 'errors.PASSWORD_TOO_SHORT', { min: 8 }), /8/);
   assert.match(t('fr', 'errors.PASSWORD_TOO_SHORT', { min: 8 }), /8/);
 });
+
+test('decoded output uses an iOS-safe readonly textarea', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  assert.match(html, /<textarea[^>]+id="decoded"[^>]+readonly/);
+  assert.match(app, /renderDecodedMessage\(data\.message\)/);
+  assert.doesNotMatch(app, /\$\('decoded'\)\.textContent\s*=\s*data\.message/);
+});
+
+test('UI prevents encode/decode crypto operations from overlapping', () => {
+  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /let operationInProgress = false/);
+  assert.match(app, /if \(operationInProgress\) return false/);
+  assert.match(app, /\['encodeBtn', 'decodeBtn', 'loadFileBtn'\]/);
+});
+
+test('decoder snapshots JSON and password before asynchronous crypto', () => {
+  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /const jsonSnapshot = \$\('jsonBox'\)\.value/);
+  assert.match(app, /const passwordSnapshot = \$\('decodePassword'\)\.value/);
+  assert.match(app, /decodeBoards\(parsed\.boards, passwordSnapshot\)/);
+});
+

@@ -172,7 +172,7 @@ button:active:not(:disabled) { transform: translate(2px,2px); box-shadow: 1px 1p
 .player-controls { min-width: 0; }
 .range { width: 100%; accent-color: var(--pink); }
 .event-card { min-height: 95px; margin-top: 14px; line-height: 1.6; }
-.output-panel pre { min-height: 72px; white-space: pre-wrap; word-break: break-word; padding: 16px; border: 3px solid var(--ink); border-radius: 7px 14px; background: linear-gradient(135deg, #110c1c, #301246); color: #f9f0ff; box-shadow: 5px 5px 0 var(--cyan); }
+.output-panel .decoded-output { width: 100%; min-height: 96px; resize: vertical; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; border: 3px solid var(--ink); border-radius: 7px 14px; background: linear-gradient(135deg, #110c1c, #301246); color: #f9f0ff; box-shadow: 5px 5px 0 var(--cyan); font: inherit; line-height: 1.55; -webkit-text-fill-color: #f9f0ff; opacity: 1; }
 .note { line-height: 1.55; background: repeating-linear-gradient(-45deg, rgba(255,228,94,.13) 0 10px, transparent 10px 20px), rgba(255,252,232,.95); }
 
 /* 2048 UI LOCK — intentionally kept in the classic style. */

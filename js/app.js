@@ -4,6 +4,7 @@ import { LANGUAGE_STORAGE_KEY, resolveInitialLanguage, t } from './i18n.js';
 let currentPayload = null;
 let currentBoards = null;
 let currentTrajectory = null;
+let operationInProgress = false;
 let currentLanguage = resolveInitialLanguage({
   storedLanguage: readStoredLanguage(),
   browserLanguage: navigator.languages?.[0] || navigator.language || 'en',
@@ -157,10 +158,45 @@ function refreshDynamicViews() {
   }
 }
 
-function setBusy(button, busy, busyKey, idleKey) {
-  button.disabled = busy;
-  button.textContent = t(currentLanguage, busy ? busyKey : idleKey);
-  document.body.classList.toggle('busy', busy);
+function beginCryptoOperation(button, busyKey) {
+  if (operationInProgress) return false;
+  operationInProgress = true;
+  ['encodeBtn', 'decodeBtn', 'loadFileBtn'].forEach(id => {
+    const control = $(id);
+    if (control) control.disabled = true;
+  });
+  button.textContent = t(currentLanguage, busyKey);
+  document.body.classList.add('busy');
+  return true;
+}
+
+function endCryptoOperation(button, idleKey) {
+  operationInProgress = false;
+  ['encodeBtn', 'decodeBtn', 'loadFileBtn'].forEach(id => {
+    const control = $(id);
+    if (control) control.disabled = false;
+  });
+  $('downloadBtn').disabled = !currentPayload;
+  button.textContent = t(currentLanguage, idleKey);
+  document.body.classList.remove('busy');
+}
+
+// Safari/iOS is more reliable when decrypted text is written to a readonly
+// textarea value rather than repainting a styled <pre> after Web Crypto work.
+function renderDecodedMessage(message) {
+  const output = $('decoded');
+  const value = String(message ?? '');
+  output.value = value;
+  output.scrollTop = 0;
+  output.scrollLeft = 0;
+
+  // Give WebKit a paint boundary after the async crypto task. This is harmless
+  // elsewhere and avoids stale/partial visual contents seen on some iOS builds.
+  requestAnimationFrame(() => {
+    output.value = value;
+    // Reading a layout property forces WebKit to commit the updated control.
+    void output.offsetHeight;
+  });
 }
 
 async function encode() {
@@ -172,7 +208,7 @@ async function encode() {
     $('encodeError').textContent = t(currentLanguage, 'errors.MESSAGE_TOO_LONG', { max: MAX_MESSAGE_BYTES });
     return;
   }
-  setBusy(button, true, 'encode.generating', 'encode.generate');
+  if (!beginCryptoOperation(button, 'encode.generating')) return;
   try {
     await new Promise(resolve => requestAnimationFrame(() => resolve()));
     const data = await encodeMessage(message, password);
@@ -183,30 +219,32 @@ async function encode() {
   } catch (error) {
     $('encodeError').textContent = formatError(error, 'errors.ENCODE_GENERIC');
   } finally {
-    setBusy(button, false, 'encode.generating', 'encode.generate');
+    endCryptoOperation(button, 'encode.generate');
   }
 }
 
 async function decode() {
   const button = $('decodeBtn');
   $('decodeError').textContent = '';
-  setBusy(button, true, 'decode.decrypting', 'decode.decrypt');
+  if (!beginCryptoOperation(button, 'decode.decrypting')) return;
+  const jsonSnapshot = $('jsonBox').value;
+  const passwordSnapshot = $('decodePassword').value;
   try {
-    const parsed = JSON.parse($('jsonBox').value);
+    const parsed = JSON.parse(jsonSnapshot);
     if (!parsed || parsed.format !== FORMAT || !Array.isArray(parsed.boards)) {
       $('decodeError').textContent = t(currentLanguage, 'errors.JSON_FORMAT_INVALID', { format: FORMAT });
       return;
     }
     await new Promise(resolve => requestAnimationFrame(() => resolve()));
-    const data = await decodeBoards(parsed.boards, $('decodePassword').value);
-    $('decoded').textContent = data.message;
+    const data = await decodeBoards(parsed.boards, passwordSnapshot);
+    renderDecodedMessage(data.message);
     renderTrajectory(parsed.boards, data.trajectory);
   } catch (error) {
     $('decodeError').textContent = error instanceof SyntaxError
       ? t(currentLanguage, 'errors.JSON_INVALID')
       : formatError(error, 'errors.DECODE_GENERIC');
   } finally {
-    setBusy(button, false, 'decode.decrypting', 'decode.decrypt');
+    endCryptoOperation(button, 'decode.decrypt');
   }
 }
 
